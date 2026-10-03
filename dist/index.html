@@ -286,7 +286,7 @@
         const range=selectedRange();if(!range||busy)return;
         busy=true;videoAbort=false;clearVideoResult();updateEstimate();video.pause();
         cancelVideo.hidden=false;cancelVideo.disabled=false;videoProgress.hidden=false;videoProgress.removeAttribute('value');
-        let ffmpeg=null, lastLog='';
+        let ffmpeg=null, wasmBlobUrl=null, lastLog='';
         try{
           setVideoStatus('動画処理の準備中です。初回は少し時間がかかります…');
           const {FFmpeg}=await import('./vendor/ffmpeg/index.js');
@@ -298,10 +298,18 @@
             videoProgress.value=Math.min(1,ratio);videoProgress.max=1;
             setVideoStatus(`MP4を作成中… ${Math.min(99,Math.round(ratio*100))}%`);
           });
+          const wasmParts=await Promise.all(['1','2'].map(async part=>{
+            const response=await fetch(`./vendor/core/ffmpeg-core.wasm.${part}`);
+            if(!response.ok)throw new Error('動画処理の準備ファイルを読み込めませんでした。');
+            return response.blob();
+          }));
+          if(videoAbort)return;
+          wasmBlobUrl=URL.createObjectURL(new Blob(wasmParts,{type:'application/wasm'}));
           await ffmpeg.load({
             coreURL:new URL('./vendor/core/ffmpeg-core.js',document.baseURI).href,
-            wasmURL:new URL('./vendor/core/ffmpeg-core.wasm',document.baseURI).href
+            wasmURL:wasmBlobUrl
           });
+          URL.revokeObjectURL(wasmBlobUrl);wasmBlobUrl=null;
           if(videoAbort)return;
           setVideoStatus('動画を読み込み、選んだ範囲を処理しています…');
           await ffmpeg.createDir('/input');
@@ -331,6 +339,7 @@
           if(videoAbort)setVideoStatus('動画の保存を中止しました。');
           else setVideoStatus(`MP4を作成できませんでした。${err.message||err} 短い範囲で再試行してください。`,true);
         }finally{
+          if(wasmBlobUrl)URL.revokeObjectURL(wasmBlobUrl);
           if(ffmpeg){ffmpeg.terminate();if(videoEngine===ffmpeg)videoEngine=null;}
           busy=false;cancelVideo.hidden=true;videoProgress.hidden=true;updateEstimate();
         }
