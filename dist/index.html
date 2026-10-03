@@ -1,0 +1,235 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#e8ecdf">
+  <meta name="description" content="動画から一定間隔で画像を切り出し、まとめて保存するツール。">
+  <title>コマ切り — 動画から画像を切り出す</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23244838'/%3E%3Crect x='12' y='13' width='40' height='38' rx='5' fill='%23f6f7ef'/%3E%3Cpath d='M12 26h40M12 38h40M26 13v38M39 13v38' stroke='%23244838' stroke-width='2'/%3E%3C/svg%3E">
+  <style>
+    :root { color-scheme: light; --ink:#18362a; --muted:#5e6f63; --line:#d4dece; --paper:#f7f8f0; --bg:#e8ecdf; --green:#244838; --lime:#dcebbd; --white:#fff; }
+    * { box-sizing:border-box; }
+    html { font-family: system-ui,-apple-system,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif; background:var(--bg); color:var(--ink); }
+    body { margin:0; min-width:280px; }
+    button,input,select { font:inherit; }
+    button { cursor:pointer; }
+    .wrap { width:min(760px,100%); margin:auto; padding:20px 18px max(36px,env(safe-area-inset-bottom)); }
+    header { display:flex; justify-content:space-between; align-items:baseline; gap:10px; margin:2px 0 16px; }
+    h1 { margin:0; font-size:clamp(1.6rem,6vw,2.2rem); letter-spacing:.035em; }
+    .eyebrow { color:var(--muted); font-size:.72rem; font-weight:750; letter-spacing:.16em; }
+    .card { background:var(--paper); border:1px solid #dfe6d8; border-radius:24px; box-shadow:0 8px 28px #1b39220d; padding:20px; margin-bottom:15px; }
+    .intro { margin:0 0 14px; line-height:1.65; color:var(--muted); font-size:.94rem; }
+    .drop { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:126px; padding:18px; border:2px dashed #a9bd9e; border-radius:17px; background:#f2f5eb; text-align:center; transition:.15s; }
+    .drop.dragging { background:var(--lime); border-color:var(--green); }
+    .drop strong { font-size:1rem; }
+    .drop small { color:var(--muted); margin-top:6px; line-height:1.4; }
+    .drop input { position:absolute; width:1px; height:1px; opacity:0; }
+    .file-meta { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; color:var(--muted); font-size:.83rem; overflow-wrap:anywhere; }
+    video { display:block; width:100%; max-height:270px; margin-top:14px; border-radius:12px; background:#1c2b21; object-fit:contain; }
+    [hidden] { display:none !important; }
+    h2 { margin:0 0 14px; font-size:1.1rem; }
+    .grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:13px; }
+    label.field { display:flex; flex-direction:column; gap:6px; font-weight:700; font-size:.88rem; }
+    label.field span { color:var(--muted); font-weight:500; font-size:.74rem; }
+    input[type=number], select { min-width:0; width:100%; border:1px solid #b7c8b2; background:var(--white); color:var(--ink); padding:12px 11px; border-radius:11px; outline-color:#789c75; }
+    input[type=number] { appearance:textfield; }
+    .estimate { border-radius:12px; background:#edf2e5; padding:11px 13px; line-height:1.5; margin:15px 0 12px; font-size:.91rem; }
+    .estimate strong { font-size:1.12rem; }
+    .tip { margin:0 0 15px; color:var(--muted); font-size:.82rem; line-height:1.55; }
+    .actions { display:flex; gap:10px; flex-wrap:wrap; }
+    .primary,.secondary { min-height:48px; padding:11px 17px; border-radius:12px; font-weight:750; border:1px solid var(--green); }
+    .primary { background:var(--green); color:#fff; flex:1; }
+    .secondary { background:#fff; color:var(--green); }
+    button:disabled { cursor:not-allowed; opacity:.47; }
+    progress { width:100%; height:13px; accent-color:var(--green); margin:14px 0 4px; }
+    .status { margin:8px 0 0; min-height:1.4em; color:var(--muted); font-size:.88rem; line-height:1.5; }
+    .status.error { color:#a1352c; }
+    .results-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .results-head h2 { margin:0; }
+    .results-actions { display:flex; gap:8px; flex-wrap:wrap; }
+    .results-actions button { font-size:.85rem; min-height:40px; padding:8px 11px; }
+    .thumbs { display:grid; grid-template-columns:repeat(auto-fill,minmax(110px,1fr)); gap:10px; margin-top:15px; }
+    .thumb { display:block; border:1px solid var(--line); border-radius:12px; overflow:hidden; background:#fff; cursor:pointer; }
+    .thumb input { position:absolute; opacity:0; }
+    .thumb img { width:100%; aspect-ratio:16/9; object-fit:contain; background:#dce4d4; display:block; }
+    .thumb span { display:block; padding:7px 8px; font-size:.8rem; font-weight:700; }
+    .thumb:has(input:checked) { outline:3px solid #7b9f70; outline-offset:1px; }
+    .thumb:has(input:focus-visible) { outline:3px solid #7b9f70; }
+    .foot { color:var(--muted); font-size:.78rem; line-height:1.6; text-align:center; padding:5px 8px; }
+    @media(max-width:430px) { .wrap{padding:15px 12px max(24px,env(safe-area-inset-bottom))} .card{padding:17px 15px;border-radius:20px} .grid{gap:10px} .thumbs{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px} .thumb span{font-size:.72rem} }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <header><div><div class="eyebrow">VIDEO → FRAMES</div><h1>コマ切り</h1></div></header>
+    <section class="card" aria-labelledby="file-heading">
+      <h2 id="file-heading">1. 動画を選ぶ</h2>
+      <p class="intro">動画から画像を一定間隔で切り出します。処理はこの端末の中で行います。</p>
+      <label class="drop" id="drop"><input id="file" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" aria-label="動画ファイルを選ぶ"><strong>動画を選択</strong><small>スマホの写真・ファイル、またはPCの動画を選べます</small></label>
+      <div class="file-meta" id="file-meta" hidden></div>
+      <video id="video" controls playsinline preload="metadata" muted hidden></video>
+    </section>
+    <section class="card" aria-labelledby="settings-heading">
+      <h2 id="settings-heading">2. 間隔と範囲</h2>
+      <div class="grid">
+        <label class="field">間隔<select id="interval"><option value="1">1秒（基本）</option><option value="0.5">0.5秒（動きの確認）</option><option value="0.1">0.1秒（短い場面）</option><option value="2">2秒（長い動画）</option></select></label>
+        <label class="field">画像の幅<select id="width"><option value="720">720px（基本）</option><option value="480">480px（軽量）</option><option value="1280">1280px（高画質）</option></select></label>
+        <label class="field">開始 <span>秒</span><input id="start" type="number" min="0" step="0.1" value="0" inputmode="decimal"></label>
+        <label class="field">終了 <span>秒</span><input id="end" type="number" min="0" step="0.1" value="0" inputmode="decimal"></label>
+      </div>
+      <div class="estimate" id="estimate" aria-live="polite">動画を選ぶと枚数を表示します。</div>
+      <p class="tip">目安は1秒、速い操作を見るなら0.5秒。0.1秒は数秒間の詳しい確認向けです。1回につき最大120枚です。</p>
+      <div class="actions"><button class="primary" id="extract" disabled>画像を切り出す</button><button class="secondary" id="cancel" hidden>中止</button></div>
+      <progress id="progress" value="0" max="1" hidden></progress>
+      <p class="status" id="status" role="status" aria-live="polite"></p>
+    </section>
+    <section class="card" id="results" hidden aria-labelledby="results-heading">
+      <div class="results-head"><h2 id="results-heading">3. 画像を保存</h2><div class="results-actions"><button class="secondary" id="select-all">すべて選択</button><button class="secondary" id="select-none">選択解除</button></div></div>
+      <p class="intro" style="margin:12px 0 0">画像をタップして選べます。共有が使えない場合はZIPを保存してください。</p>
+      <div class="actions" style="margin-top:12px"><button class="primary" id="share">選択画像を共有</button><button class="secondary" id="download">選択画像をZIP保存</button></div>
+      <div class="thumbs" id="thumbs"></div>
+    </section>
+    <p class="foot">保存先を選ぶ操作以外で、動画や画像をサーバーへ送信しません。動画形式によってはブラウザーが読み込めない場合があります。</p>
+  </main>
+  <script>
+    (() => {
+      const $ = id => document.getElementById(id);
+      const fileInput=$('file'), video=$('video'), fileMeta=$('file-meta'), drop=$('drop');
+      const start=$('start'), end=$('end'), interval=$('interval'), width=$('width');
+      const extract=$('extract'), cancel=$('cancel'), progress=$('progress'), status=$('status');
+      const results=$('results'), thumbs=$('thumbs'), estimate=$('estimate');
+      let sourceUrl=null, sourceFile=null, frames=[], cancelRequested=false, busy=false;
+      const MAX_FRAMES=120;
+
+      function setStatus(message,error=false){ status.textContent=message; status.classList.toggle('error',error); }
+      function seconds(n){ return `${Number(n).toFixed(1)}秒`; }
+      function clearFrames(){ frames.forEach(f=>URL.revokeObjectURL(f.url)); frames=[]; thumbs.replaceChildren(); results.hidden=true; }
+      function plan(){
+        if(!sourceFile || !Number.isFinite(video.duration)) return null;
+        const a=Number(start.value), b=Number(end.value), step=Number(interval.value);
+        if(!Number.isFinite(a)||!Number.isFinite(b)||!Number.isFinite(step)||a<0||b<=a||b>video.duration+0.05) return {error:'開始・終了を動画の長さの範囲で指定してください。'};
+        const count=Math.floor((b-a+1e-7)/step)+1;
+        if(count>MAX_FRAMES) return {error:`${count}枚になります。終了を早めるか間隔を広げて、${MAX_FRAMES}枚以下にしてください。`};
+        return {a,b,step,count};
+      }
+      function updateEstimate(){
+        const p=plan();
+        extract.disabled=busy||!p||!!p.error;
+        if(!sourceFile) {estimate.textContent='動画を選ぶと枚数を表示します。';return;}
+        if(!p) {estimate.textContent='動画を読み込み中です。';return;}
+        estimate.innerHTML=p.error ? '' : `<strong>${p.count}枚</strong> を切り出します（${seconds(p.a)}〜${seconds(p.b)}）。`;
+        if(p.error) estimate.textContent=p.error;
+      }
+      function useFile(file){
+        if(!file) return;
+        if(sourceUrl) URL.revokeObjectURL(sourceUrl);
+        clearFrames(); sourceFile=file; sourceUrl=URL.createObjectURL(file);
+        video.hidden=false; video.src=sourceUrl; video.load();
+        fileMeta.hidden=false; fileMeta.textContent=`${file.name} ・ ${(file.size/1024/1024).toFixed(1)} MB`;
+        start.value='0'; end.value='0'; setStatus('動画を読み込み中です…'); updateEstimate();
+      }
+      fileInput.addEventListener('change',()=>useFile(fileInput.files[0]));
+      for(const event of ['dragenter','dragover']) drop.addEventListener(event,e=>{e.preventDefault();drop.classList.add('dragging')});
+      for(const event of ['dragleave','drop']) drop.addEventListener(event,e=>{e.preventDefault();drop.classList.remove('dragging')});
+      drop.addEventListener('drop',e=>useFile(Array.from(e.dataTransfer.files).find(f=>f.type.startsWith('video/'))));
+      video.addEventListener('loadedmetadata',()=>{
+        if(!Number.isFinite(video.duration)){setStatus('この動画の長さを読み取れません。別の形式で試してください。',true);return;}
+        end.value=String(Math.min(video.duration,30).toFixed(2));
+        fileMeta.textContent=`${sourceFile.name} ・ ${seconds(video.duration)} ・ ${video.videoWidth}×${video.videoHeight} ・ ${(sourceFile.size/1024/1024).toFixed(1)} MB`;
+        setStatus('範囲と間隔を選んでください。'); updateEstimate();
+      });
+      video.addEventListener('error',()=>setStatus('この動画をブラウザーで開けません。MP4（H.264）などに変換して試してください。',true));
+      for(const el of [start,end,interval,width]) el.addEventListener('input',updateEstimate);
+      function waitFor(target,event,timeout=12000){ return new Promise((resolve,reject)=>{
+        const timer=setTimeout(()=>{target.removeEventListener(event,done);reject(new Error('動画の読み込みがタイムアウトしました。'))},timeout);
+        function done(){clearTimeout(timer);resolve()}; target.addEventListener(event,done,{once:true});
+      })}
+      async function seekTo(time){
+        const target=Math.min(Math.max(0,time),Math.max(0,video.duration-0.02));
+        if(Math.abs(video.currentTime-target)>0.001){ const ready=waitFor(video,'seeked'); video.currentTime=target; await ready; }
+        if(video.readyState<2) await waitFor(video,'loadeddata');
+        await new Promise(resolve=>requestAnimationFrame(resolve));
+      }
+      function canvasBlob(canvas){ return new Promise((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('画像を作成できませんでした。')),'image/jpeg',0.86)); }
+      extract.addEventListener('click',async()=>{
+        const p=plan(); if(!p||p.error||busy)return;
+        busy=true; cancelRequested=false; clearFrames(); updateEstimate();
+        cancel.hidden=false; cancel.disabled=false; progress.hidden=false; progress.value=0; progress.max=p.count; video.pause();
+        const targetWidth=Math.min(Number(width.value),video.videoWidth), targetHeight=Math.round(targetWidth*video.videoHeight/video.videoWidth);
+        const canvas=document.createElement('canvas'); canvas.width=targetWidth; canvas.height=targetHeight;
+        const ctx=canvas.getContext('2d',{alpha:false});
+        try {
+          if(!ctx||!targetWidth||!targetHeight) throw new Error('動画の画像サイズを取得できませんでした。');
+          for(let i=0;i<p.count;i++){
+            if(cancelRequested) break;
+            const t=Math.min(p.b,p.a+i*p.step);
+            setStatus(`${i+1} / ${p.count} 枚を切り出し中…`);
+            await seekTo(t);
+            ctx.drawImage(video,0,0,targetWidth,targetHeight);
+            const blob=await canvasBlob(canvas);
+            frames.push({time:t,blob,url:URL.createObjectURL(blob),name:`frame_${String(i+1).padStart(3,'0')}_${t.toFixed(1).replace('.','-')}s.jpg`});
+            progress.value=i+1;
+            if(i%5===4) await new Promise(resolve=>setTimeout(resolve,0));
+          }
+          if(cancelRequested){clearFrames();setStatus('中止しました。');}
+          else {showFrames();setStatus(`${frames.length}枚を切り出しました。画像を選んで共有または保存できます。`);}
+        } catch(err){clearFrames();setStatus(`切り出しに失敗しました。${err.message||err}`,true);}
+        finally {busy=false;cancel.hidden=true;progress.hidden=true;updateEstimate();}
+      });
+      cancel.addEventListener('click',()=>{cancelRequested=true;cancel.disabled=true;setStatus('中止しています…')});
+      function showFrames(){
+        const frag=document.createDocumentFragment();
+        frames.forEach((frame,i)=>{
+          const label=document.createElement('label'); label.className='thumb';
+          const check=document.createElement('input'); check.type='checkbox';check.checked=true;check.dataset.index=i;check.setAttribute('aria-label',`${seconds(frame.time)} の画像を選択`);
+          const img=document.createElement('img');img.src=frame.url;img.alt=`${seconds(frame.time)} の動画フレーム`;img.loading='lazy';
+          const caption=document.createElement('span');caption.textContent=seconds(frame.time);
+          label.append(check,img,caption);frag.append(label);
+        });
+        thumbs.replaceChildren(frag);results.hidden=false;
+      }
+      function chosen(){return Array.from(thumbs.querySelectorAll('input:checked')).map(c=>frames[Number(c.dataset.index)]);}
+      $('select-all').addEventListener('click',()=>thumbs.querySelectorAll('input').forEach(c=>c.checked=true));
+      $('select-none').addEventListener('click',()=>thumbs.querySelectorAll('input').forEach(c=>c.checked=false));
+      $('share').addEventListener('click',async()=>{
+        const picked=chosen();if(!picked.length){setStatus('共有する画像を選んでください。',true);return;}
+        if(!navigator.share){setStatus('このブラウザーでは共有できません。ZIP保存を使ってください。',true);return;}
+        const files=picked.map(f=>new File([f.blob],f.name,{type:'image/jpeg'}));
+        if(navigator.canShare&&!navigator.canShare({files})){setStatus('この枚数は共有できません。枚数を減らすかZIP保存を使ってください。',true);return;}
+        try{await navigator.share({files,title:'動画の切り出し画像'});setStatus(`${picked.length}枚の共有画面を開きました。`)}
+        catch(err){if(err.name!=='AbortError')setStatus('共有できませんでした。ZIP保存を使ってください。',true)}
+      });
+      const crcTable=(()=>{const t=[];for(let n=0;n<256;n++){let c=n;for(let k=0;k<8;k++)c=(c&1)?0xedb88320^(c>>>1):c>>>1;t[n]=c>>>0}return t})();
+      function crc32(bytes){let c=-1;for(const b of bytes)c=crcTable[(c^b)&255]^(c>>>8);return(c^-1)>>>0}
+      function zipFile(entries){
+        const encoder=new TextEncoder(), parts=[], central=[];let offset=0;
+        for(const item of entries){
+          const name=encoder.encode(item.name), data=item.data, crc=crc32(data);
+          const local=new Uint8Array(30+name.length), lv=new DataView(local.buffer);
+          lv.setUint32(0,0x04034b50,true);lv.setUint16(4,20,true);lv.setUint16(6,0x0800,true);lv.setUint32(14,crc,true);lv.setUint32(18,data.length,true);lv.setUint32(22,data.length,true);lv.setUint16(26,name.length,true);local.set(name,30);
+          parts.push(local,data);
+          const dir=new Uint8Array(46+name.length), dv=new DataView(dir.buffer);
+          dv.setUint32(0,0x02014b50,true);dv.setUint16(4,20,true);dv.setUint16(6,20,true);dv.setUint16(8,0x0800,true);dv.setUint32(16,crc,true);dv.setUint32(20,data.length,true);dv.setUint32(24,data.length,true);dv.setUint16(28,name.length,true);dv.setUint32(42,offset,true);dir.set(name,46);central.push(dir);
+          offset+=local.length+data.length;
+        }
+        const centralSize=central.reduce((n,c)=>n+c.length,0), end=new Uint8Array(22), ev=new DataView(end.buffer);
+        ev.setUint32(0,0x06054b50,true);ev.setUint16(8,entries.length,true);ev.setUint16(10,entries.length,true);ev.setUint32(12,centralSize,true);ev.setUint32(16,offset,true);
+        return new Blob([...parts,...central,end],{type:'application/zip'});
+      }
+      $('download').addEventListener('click',async()=>{
+        const picked=chosen();if(!picked.length){setStatus('保存する画像を選んでください。',true);return;}
+        $('download').disabled=true;setStatus(`${picked.length}枚をZIPにまとめています…`);
+        try{
+          const entries=[];for(const f of picked) entries.push({name:f.name,data:new Uint8Array(await f.blob.arrayBuffer())});
+          const zip=zipFile(entries), url=URL.createObjectURL(zip), a=document.createElement('a');
+          a.href=url;a.download=`frames_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.zip`;
+          document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);
+          setStatus(`${picked.length}枚のZIPを保存しました。スマホでは「ファイル」アプリから開けます。`);
+        }catch(err){setStatus(`ZIP保存に失敗しました。${err.message||err}`,true)}
+        finally{$('download').disabled=false}
+      });
+    })();
+  </script>
+</body>
+</html>
