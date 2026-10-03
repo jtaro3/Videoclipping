@@ -4,8 +4,8 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#e8ecdf">
-  <meta name="description" content="動画から一定間隔で画像を切り出し、まとめて保存するツール。">
-  <title>コマ切り — 動画から画像を切り出す</title>
+  <meta name="description" content="動画の範囲を選び、MP4動画または一定間隔の画像として保存するツール。">
+  <title>コマ切り — 動画を切り出して保存</title>
   <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='15' fill='%23244838'/%3E%3Crect x='12' y='13' width='40' height='38' rx='5' fill='%23f6f7ef'/%3E%3Cpath d='M12 26h40M12 38h40M26 13v38M39 13v38' stroke='%23244838' stroke-width='2'/%3E%3C/svg%3E">
   <style>
     :root { color-scheme: light; --ink:#18362a; --muted:#5e6f63; --line:#d4dece; --paper:#f7f8f0; --bg:#e8ecdf; --green:#244838; --lime:#dcebbd; --white:#fff; }
@@ -58,6 +58,11 @@
     progress { width:100%; height:13px; accent-color:var(--green); margin:14px 0 4px; }
     .status { margin:8px 0 0; min-height:1.4em; color:var(--muted); font-size:.88rem; line-height:1.5; }
     .status.error { color:#a1352c; }
+    .video-export { border-top:1px solid var(--line); margin-top:20px; padding-top:18px; }
+    .video-export h3 { margin:0 0 8px; font-size:1rem; }
+    .video-export .intro { margin-bottom:12px; }
+    .video-export .actions { align-items:center; }
+    .video-export a { color:var(--green); font-weight:750; }
     .results-head { display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
     .results-head h2 { margin:0; }
     .results-actions { display:flex; gap:8px; flex-wrap:wrap; }
@@ -78,7 +83,7 @@
     <header><div><div class="eyebrow">VIDEO → FRAMES</div><h1>コマ切り</h1></div></header>
     <section class="card" aria-labelledby="file-heading">
       <h2 id="file-heading">1. 動画を選ぶ</h2>
-      <p class="intro">動画から画像を一定間隔で切り出します。処理はこの端末の中で行います。</p>
+      <p class="intro">必要な場面を動画として保存したり、画像を一定間隔で切り出せます。処理はこの端末の中で行います。</p>
       <label class="drop" id="drop"><input id="file" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" aria-label="動画ファイルを選ぶ"><strong id="file-action">動画を選択</strong><small id="file-hint">スマホの写真・ファイル、またはPCの動画を選べます</small></label>
       <div class="file-meta" id="file-meta" hidden></div>
       <button class="secondary" id="retry-load" hidden style="margin-top:12px">動画の読み込みを再試行</button>
@@ -91,8 +96,18 @@
         <div><div class="trim-label"><label for="end-range">終了位置</label><output id="end-display">0:00.0</output></div><input id="end-range" type="range" min="0" max="0" step="0.1" value="0" disabled></div>
       </div>
       <p class="trim-summary" id="trim-summary">動画を選ぶとスライダーを動かせます。</p>
+      <div class="video-export" style="border-top:0;margin-top:0;padding-top:0">
+        <h3>選んだ範囲を動画で保存</h3>
+        <p class="intro">元の音声を含むMP4を作成します。短い場面からお試しください。</p>
+        <div class="actions"><button class="primary" id="save-video" disabled>選択範囲をMP4で保存</button><button class="secondary" id="cancel-video" hidden>中止</button></div>
+        <progress id="video-progress" hidden></progress>
+        <p class="status" id="video-status" role="status" aria-live="polite"></p>
+        <div class="actions" id="video-result" hidden><a class="secondary" id="video-download" download style="text-decoration:none;display:inline-flex;align-items:center">MP4をもう一度保存</a><button class="secondary" id="share-video" hidden>動画を共有</button></div>
+      </div>
+      <div class="video-export">
+        <h3>画像として切り出す</h3>
       <div class="grid">
-        <label class="field">間隔<select id="interval"><option value="1">1秒（基本）</option><option value="0.5">0.5秒（動きの確認）</option><option value="0.1">0.1秒（短い場面）</option><option value="2">2秒（長い動画）</option></select></label>
+        <label class="field">画像の間隔<select id="interval"><option value="1">1秒（基本）</option><option value="0.5">0.5秒（動きの確認）</option><option value="0.1">0.1秒（短い場面）</option><option value="2">2秒（長い動画）</option></select></label>
         <label class="field">画像の幅<select id="width"><option value="720">720px（基本）</option><option value="480">480px（軽量）</option><option value="1280">1280px（高画質）</option></select></label>
       </div>
       <details class="precise"><summary>秒数で微調整</summary><div class="grid"><label class="field">開始 <span>秒</span><input id="start" type="number" min="0" step="0.1" value="0" inputmode="decimal"></label><label class="field">終了 <span>秒</span><input id="end" type="number" min="0" step="0.1" value="0" inputmode="decimal"></label></div></details>
@@ -101,6 +116,7 @@
       <div class="actions"><button class="primary" id="extract" disabled>画像を切り出す</button><button class="secondary" id="cancel" hidden>中止</button></div>
       <progress id="progress" value="0" max="1" hidden></progress>
       <p class="status" id="status" role="status" aria-live="polite"></p>
+      </div>
     </section>
     <section class="card" id="results" hidden aria-labelledby="results-heading">
       <div class="results-head"><h2 id="results-heading">3. 画像を保存</h2><div class="results-actions"><button class="secondary" id="select-all">すべて選択</button><button class="secondary" id="select-none">選択解除</button></div></div>
@@ -108,7 +124,7 @@
       <div class="actions" style="margin-top:12px"><button class="primary" id="share">選択画像を共有</button><button class="secondary" id="download">選択画像をZIP保存</button></div>
       <div class="thumbs" id="thumbs"></div>
     </section>
-    <p class="foot">保存先を選ぶ操作以外で、動画や画像をサーバーへ送信しません。動画形式によってはブラウザーが読み込めない場合があります。</p>
+    <p class="foot">動画や画像をサーバーへ送信しません。長い動画のMP4書き出しは端末の空きメモリによって失敗する場合があります。</p>
   </main>
   <script>
     (() => {
@@ -117,14 +133,24 @@
       const start=$('start'), end=$('end'), interval=$('interval'), width=$('width');
       const startRange=$('start-range'), endRange=$('end-range'), startDisplay=$('start-display'), endDisplay=$('end-display'), trimSummary=$('trim-summary');
       const extract=$('extract'), cancel=$('cancel'), progress=$('progress'), status=$('status');
+      const saveVideo=$('save-video'), cancelVideo=$('cancel-video'), videoProgress=$('video-progress'), videoStatus=$('video-status');
       const results=$('results'), thumbs=$('thumbs'), estimate=$('estimate');
       let sourceUrl=null, sourceFile=null, frames=[], cancelRequested=false, busy=false, metadataReady=false, loadTimer=null, previewTimer=null;
+      let videoEngine=null, exportedVideo=null, exportedUrl=null, videoAbort=false;
       const MAX_FRAMES=120;
 
       function setStatus(message,error=false){ status.textContent=message; status.classList.toggle('error',error); }
       function seconds(n){ return `${Number(n).toFixed(1)}秒`; }
       function clock(n){ const tenths=Math.round(Math.max(0,Number(n)||0)*10); return `${Math.floor(tenths/600)}:${((tenths%600)/10).toFixed(1).padStart(4,'0')}`; }
       function clearFrames(){ frames.forEach(f=>URL.revokeObjectURL(f.url)); frames=[]; thumbs.replaceChildren(); results.hidden=true; }
+      function clearVideoResult(){if(exportedUrl)URL.revokeObjectURL(exportedUrl);exportedUrl=null;exportedVideo=null;$('video-result').hidden=true;}
+      function setVideoStatus(message,error=false){videoStatus.textContent=message;videoStatus.classList.toggle('error',error);}
+      function selectedRange(){
+        if(!sourceFile||!metadataReady)return null;
+        const a=Number(start.value), b=Number(end.value);
+        if(!Number.isFinite(a)||!Number.isFinite(b)||a<0||b<=a||b>video.duration+0.05)return null;
+        return {a,b,duration:b-a};
+      }
       function syncTrimControls(){
         const ready=metadataReady&&Number.isFinite(video.duration), duration=ready?video.duration:0;
         const a=Math.min(duration,Math.max(0,Number(start.value)||0)), b=Math.min(duration,Math.max(0,Number(end.value)||0));
@@ -158,6 +184,7 @@
       }
       function updateEstimate(){
         syncTrimControls();
+        saveVideo.disabled=busy||!selectedRange();
         const p=plan();
         extract.disabled=busy||!p||!!p.error;
         if(!sourceFile) {estimate.textContent='動画を選ぶと枚数を表示します。';return;}
@@ -167,9 +194,10 @@
       }
       function useFile(file){
         if(!file || file===sourceFile) return;
+        if(busy)return;
         clearTimeout(loadTimer); metadataReady=false; $('retry-load').hidden=true;
         if(sourceUrl) URL.revokeObjectURL(sourceUrl);
-        clearFrames(); sourceFile=file; sourceUrl=null;
+        clearFrames(); clearVideoResult(); setVideoStatus(''); sourceFile=file; sourceUrl=null;
         drop.classList.add('has-file');
         $('file-action').textContent='✓ 動画を選択済み';
         $('file-hint').textContent='タップして動画を変更';
@@ -254,6 +282,68 @@
         finally {busy=false;cancel.hidden=true;progress.hidden=true;updateEstimate();}
       });
       cancel.addEventListener('click',()=>{cancelRequested=true;cancel.disabled=true;setStatus('中止しています…')});
+      saveVideo.addEventListener('click',async()=>{
+        const range=selectedRange();if(!range||busy)return;
+        busy=true;videoAbort=false;clearVideoResult();updateEstimate();video.pause();
+        cancelVideo.hidden=false;cancelVideo.disabled=false;videoProgress.hidden=false;videoProgress.removeAttribute('value');
+        let ffmpeg=null, lastLog='';
+        try{
+          setVideoStatus('動画処理の準備中です。初回は少し時間がかかります…');
+          const {FFmpeg}=await import('./vendor/ffmpeg/index.js');
+          if(videoAbort)return;
+          ffmpeg=new FFmpeg();videoEngine=ffmpeg;
+          ffmpeg.on('log',({message})=>{lastLog=message||lastLog});
+          ffmpeg.on('progress',({progress:ratio})=>{
+            if(!Number.isFinite(ratio)||ratio<0)return;
+            videoProgress.value=Math.min(1,ratio);videoProgress.max=1;
+            setVideoStatus(`MP4を作成中… ${Math.min(99,Math.round(ratio*100))}%`);
+          });
+          await ffmpeg.load({
+            coreURL:new URL('./vendor/core/ffmpeg-core.js',document.baseURI).href,
+            wasmURL:new URL('./vendor/core/ffmpeg-core.wasm',document.baseURI).href
+          });
+          if(videoAbort)return;
+          setVideoStatus('動画を読み込み、選んだ範囲を処理しています…');
+          await ffmpeg.createDir('/input');
+          const mounted=await ffmpeg.mount('WORKERFS',{files:[sourceFile]},'/input');
+          if(!mounted)throw new Error('動画ファイルを読み込めませんでした。');
+          const code=await ffmpeg.exec([
+            '-ss',range.a.toFixed(3),'-i',`/input/${sourceFile.name}`,
+            '-t',range.duration.toFixed(3),
+            '-map','0:v:0','-map','0:a?',
+            '-c:v','libx264','-preset','ultrafast','-crf','25','-pix_fmt','yuv420p',
+            '-c:a','aac','-b:a','128k','-movflags','+faststart','/trimmed.mp4'
+          ]);
+          if(videoAbort)return;
+          if(code!==0)throw new Error(lastLog||`動画の変換に失敗しました（${code}）。`);
+          setVideoStatus('保存用のMP4を準備しています…');
+          const data=await ffmpeg.readFile('/trimmed.mp4');
+          if(!data.length)throw new Error('出力した動画が空でした。');
+          const name=`trimmed_${new Date().toISOString().slice(0,19).replace(/[:T]/g,'-')}.mp4`;
+          exportedVideo=new File([data],name,{type:'video/mp4'});
+          exportedUrl=URL.createObjectURL(exportedVideo);
+          const download=$('video-download');download.href=exportedUrl;download.download=name;
+          $('video-result').hidden=false;
+          $('share-video').hidden=!(navigator.share&&(!navigator.canShare||navigator.canShare({files:[exportedVideo]})));
+          setVideoStatus(`${clock(range.a)}〜${clock(range.b)} のMP4を作成しました。「MP4をもう一度保存」から保存できます。`);
+          download.click();
+        }catch(err){
+          if(videoAbort)setVideoStatus('動画の保存を中止しました。');
+          else setVideoStatus(`MP4を作成できませんでした。${err.message||err} 短い範囲で再試行してください。`,true);
+        }finally{
+          if(ffmpeg){ffmpeg.terminate();if(videoEngine===ffmpeg)videoEngine=null;}
+          busy=false;cancelVideo.hidden=true;videoProgress.hidden=true;updateEstimate();
+        }
+      });
+      cancelVideo.addEventListener('click',()=>{
+        videoAbort=true;cancelVideo.disabled=true;setVideoStatus('動画の保存を中止しています…');
+        if(videoEngine)videoEngine.terminate();
+      });
+      $('share-video').addEventListener('click',async()=>{
+        if(!exportedVideo||!navigator.share)return;
+        try{await navigator.share({files:[exportedVideo],title:'切り出した動画'});setVideoStatus('動画の共有画面を開きました。')}
+        catch(err){if(err.name!=='AbortError')setVideoStatus('共有できませんでした。「MP4をもう一度保存」をお試しください。',true)}
+      });
       function showFrames(){
         const frag=document.createDocumentFragment();
         frames.forEach((frame,i)=>{
