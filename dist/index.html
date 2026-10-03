@@ -24,6 +24,9 @@
     .drop.dragging { background:var(--lime); border-color:var(--green); }
     .drop strong { font-size:1rem; }
     .drop small { color:var(--muted); margin-top:6px; line-height:1.4; }
+    .drop.has-file { background:#fff0ed; border-color:#bb443b; border-style:solid; }
+    .drop.has-file strong { padding:8px 16px; border-radius:999px; background:#b63e36; color:#fff; }
+    .drop.has-file small { color:#873d37; }
     .drop input { position:absolute; inset:0; width:100%; height:100%; opacity:0; cursor:pointer; }
     .drop:focus-within { outline:3px solid #7b9f70; outline-offset:2px; }
     .file-meta { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; color:var(--muted); font-size:.83rem; overflow-wrap:anywhere; }
@@ -67,7 +70,7 @@
     <section class="card" aria-labelledby="file-heading">
       <h2 id="file-heading">1. 動画を選ぶ</h2>
       <p class="intro">動画から画像を一定間隔で切り出します。処理はこの端末の中で行います。</p>
-      <label class="drop" id="drop"><input id="file" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" aria-label="動画ファイルを選ぶ"><strong>動画を選択</strong><small>スマホの写真・ファイル、またはPCの動画を選べます</small></label>
+      <label class="drop" id="drop"><input id="file" type="file" accept="video/*,.mp4,.mov,.m4v,.webm" aria-label="動画ファイルを選ぶ"><strong id="file-action">動画を選択</strong><small id="file-hint">スマホの写真・ファイル、またはPCの動画を選べます</small></label>
       <div class="file-meta" id="file-meta" hidden></div>
       <video id="video" controls playsinline preload="metadata" muted hidden></video>
       <button class="secondary" id="retry-load" hidden style="margin-top:12px">動画の読み込みを再試行</button>
@@ -128,6 +131,10 @@
         clearTimeout(loadTimer); metadataReady=false; $('retry-load').hidden=true;
         if(sourceUrl) URL.revokeObjectURL(sourceUrl);
         clearFrames(); sourceFile=file; sourceUrl=null;
+        drop.classList.add('has-file');
+        $('file-action').textContent='✓ 動画を選択済み';
+        $('file-hint').textContent='タップして動画を変更';
+        fileInput.setAttribute('aria-label','選択済みの動画を変更');
         fileMeta.hidden=false; fileMeta.textContent=`選択済み：${file.name} ・ ${(file.size/1024/1024).toFixed(1)} MB`;
         start.value='0'; end.value='0'; setStatus('動画の長さを読み込み中です…'); updateEstimate();
         try {
